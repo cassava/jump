@@ -22,6 +22,16 @@ import (
 	flag "github.com/ogier/pflag"
 )
 
+// The reason for this is that stdout is evaluated by the shell, and we only
+// want one thing evaluated. Everything else should go to stderr.
+// I don't know what other packages here might somehow print to stdout;
+// I'm trying my best to prevent it. May or may not work.
+var stdout = os.Stdout
+
+func init() {
+	os.Stdout = os.Stderr
+}
+
 var (
 	create bool
 	modify bool
@@ -33,7 +43,7 @@ func init() {
 	flag.BoolVarP(&modify, "modify", "m", false, "modify a jump point")
 	flag.BoolVarP(&remove, "remove", "r", false, "remove a jump point")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [-cmr] profile [path]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [-cmr] profile [path]\n\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 }
@@ -44,17 +54,15 @@ var (
 	ErrNotAbs    = errors.New("jump path should be absolute")
 )
 
-var xdgName = "jp/"
-
 func profile(name string) string {
-	return "jp/" + name
+	return "jump/" + name
 }
 
 func listJP() error {
 	type entry struct{ Name, Path string }
 	all := []entry{}
 
-	err := xdg.MergeConfigR("jp", func(dir string) error {
+	err := xdg.MergeConfigR("jump", func(dir string) error {
 		return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "Error:", err)
@@ -88,7 +96,7 @@ func listJP() error {
 	}
 	format := fmt.Sprintf("%%-%ds\t%%s\n", max)
 	for _, e := range all {
-		fmt.Printf(format, e.Name, e.Path)
+		fmt.Fprintf(os.Stderr, format, e.Name, e.Path)
 	}
 	return nil
 }
@@ -128,7 +136,8 @@ func jump(name string) error {
 	if err != nil {
 		return err
 	}
-	return os.Chdir(dst)
+	fmt.Fprintf(stdout, "cd %q\n", dst)
+	return nil
 }
 
 func main() {
