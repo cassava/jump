@@ -33,15 +33,18 @@ func init() {
 }
 
 var (
+	source bool
 	create bool
 	modify bool
 	remove bool
 )
 
 func init() {
+	flag.BoolVar(&source, "source", false, "create shell function with name")
 	flag.BoolVarP(&create, "create", "c", false, "create a new jump point")
 	flag.BoolVarP(&modify, "modify", "m", false, "modify a jump point")
 	flag.BoolVarP(&remove, "remove", "r", false, "remove a jump point")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [-cmr] profile [path]\n\n", os.Args[0])
 		flag.PrintDefaults()
@@ -56,6 +59,11 @@ var (
 
 func profile(name string) string {
 	return "jump/" + name
+}
+
+func printFn(name string) error {
+	fmt.Fprintf(stdout, "function %s() { eval $(%s $@) }\n", name, os.Args[0])
+	return nil
 }
 
 func listJP() error {
@@ -102,10 +110,19 @@ func listJP() error {
 }
 
 func createJP(name, dst string) error {
+	// Make sure the configuration directory exists
+	dirpath := xdg.UserConfig("jump")
+	if ex, _ := osutil.DirExists(dirpath); !ex {
+		os.MkdirAll(dirpath, 0777)
+	}
+
+	// Make sure the profile does not exist
 	jp := xdg.UserConfig(profile(name))
 	if ex, _ := osutil.FileExists(jp); ex {
 		return ErrExists
 	}
+
+	// Create a jump point
 	dst, err := filepath.Abs(dst)
 	if err != nil {
 		return err
@@ -145,7 +162,7 @@ func main() {
 
 	// Make sure at most one option is specified
 	toggled := 0
-	for _, opt := range []bool{create, modify, remove} {
+	for _, opt := range []bool{source, create, modify, remove} {
 		if opt {
 			toggled++
 		}
@@ -156,8 +173,14 @@ func main() {
 
 	n, args := flag.NArg(), flag.Args()
 	var err error
-	if n == 0 {
-		listJP()
+	if source {
+		name := "jp"
+		if n == 1 {
+			name = args[0]
+		} else if n > 1 {
+			usageError("too many arguments")
+		}
+		err = printFn(name)
 	} else if create {
 		if n != 2 {
 			usageError("command create requires 2 arguments")
@@ -170,6 +193,8 @@ func main() {
 		err = modifyJP(args[0], args[1])
 	} else if remove {
 		err = removeJP(args[0])
+	} else if n == 0 {
+		listJP()
 	} else {
 		err = jump(args[0])
 	}
