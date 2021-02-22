@@ -1,5 +1,9 @@
-Jump
-====
+Jump [ARCHIVED]
+===============
+
+This project is archived. Use a tool like fasd.
+
+---
 
 [![License: MIT](http://img.shields.io/badge/license-MIT-red.svg?style=flat-square)](http://opensource.org/licenses/MIT)
 
